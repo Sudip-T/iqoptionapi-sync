@@ -28,6 +28,8 @@ logger = logging.getLogger("IQOptionExample")
 # Your credentials (replace with your own)
 EMAIL = "your email"
 PASSWORD = "your password"
+EMAIL='doveautomotive@hotmail.com'     # Your IQOption email
+PASSWORD='SKKDW10080204'
 
 
 # Create client (demo account by default)
@@ -116,7 +118,7 @@ def example_get_historical_candles():
     
     # Get 50 candles of 1-minute EURUSD data
     print("📊 Fetching EURUSD 1-minute candles...")
-    candles = client.get_candles("EURUSD", count=50, timeframe=60)
+    candles = client.get_candles("EURUSD-op", count=50, timeframe=60)
     
     print(f"✅ Retrieved {len(candles)} candles")
     print("\nLast 5 candles (most recent last):")
@@ -152,7 +154,7 @@ def example_real_time_candles():
     client.on_new_candle(on_candle)
     
     # Start streaming
-    success = client.start_candle_stream("EURUSD", 60)
+    success = client.start_candle_stream("EURUSD-op", 60)
     
     if success:
         print("✅ Subscribed! Waiting 30 seconds for candles...\n")
@@ -161,7 +163,7 @@ def example_real_time_candles():
         print("❌ Subscription failed")
     
     # Cleanup
-    client.stop_candle_stream("EURUSD", 60)
+    client.stop_candle_stream("EURUSD-op", 60)
     print("✅ Stream stopped")
 
 
@@ -174,21 +176,21 @@ def example_get_current_price():
     print("="*60)
     
     # Subscribe first (to get live data)
-    client.start_candle_stream("EURUSD", 60)
+    client.start_candle_stream("EURUSD-op", 60)
     time.sleep(3)  # Wait for first candle
     
     # Get current price
-    price = client.get_current_price("EURUSD")
+    price = client.get_current_price("-op")
     print(f"💰 EURUSD current price: {price:.5f}")
     
     # Get last 5 candles
-    candles = client.get_last_candles("EURUSD", 60, count=5)
+    candles = client.get_last_candles("EURUSD-op", 60, count=5)
     print(f"\n📊 Last 5 candles stored: {len(candles)}")
     
     for i, candle in enumerate(candles):
         print(f"   Candle {i+1}: Close = {candle.close:.5f}")
     
-    client.stop_candle_stream("EURUSD", 60)
+    client.stop_candle_stream("EURUSD-op", 60)
 
 
 
@@ -210,7 +212,7 @@ def example_place_binary_trade():
     
     # Place a CALL trade (predict price will go UP)
     trade_params = OptionsTradeParams(
-        asset="EURUSD",
+        asset="EURUSD-op",
         expiry=1,  # 1 minute
         amount=10,  # $10
         direction=Direction.CALL,

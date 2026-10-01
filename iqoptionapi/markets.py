@@ -304,3 +304,44 @@ class MarketManager:
         # # df.set_index('datetime', inplace=True)
         # df.to_csv('candles.csv')
         return df
+
+
+
+    def stream_traders_mood(self, ASSET: str, timeout: float = 5.0):
+        asset_id = get_asset_id(ASSET)
+        name = "subscribeMessage"
+        msg = {
+            "name": "traders-mood-changed",
+            "params":{"routingFilters":
+                        {
+                            "instrument":"turbo-option",
+                            "asset_id":asset_id
+                        }
+                    }
+        }
+        
+        self.ws_manager.send_message(name, msg)
+        
+        deadline = time.monotonic() + timeout
+        # while time.monotonic() < deadline:
+        while True:
+            if asset_id in self.message_handler.traders_mood:
+                return True, f"✅ Trader mood subscribed for {ASSET} (id={asset_id})"
+            time.sleep(0.1)
+
+        return False, f"Timeout after {timeout}s waiting for {ASSET} (id={asset_id})"
+    
+    def stop_traders_mood(self, ASSET: str, timeout: float = 5.0):
+        asset_id = get_asset_id(ASSET)
+        name = "unsubscribeMessage"
+        msg = {
+            "name": "traders-mood-changed",
+            "params":{"routingFilters":
+                        {
+                            "instrument":"turbo-option",
+                            "asset_id":asset_id
+                        }
+                    }
+        }
+        
+        self.ws_manager.send_message(name, msg)

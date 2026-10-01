@@ -369,6 +369,7 @@ class CandleSubscriptionManager:
         
         # FIXED: Get asset name from ID using id_to_name
         asset_name = self.id_to_name.get(asset_id)
+
         if not asset_name:
             logger.warning(f"Unknown asset_id: {asset_id}")
             return
@@ -392,13 +393,16 @@ class CandleSubscriptionManager:
                 # Store the completed candle in history
                 completed_candle = Candle.from_iq_message(asset_name, asset_id, current)
                 self._candles[asset_name][timeframe].append(completed_candle)
-                
+
+                # Snapshot AFTER appending, so it includes the just-closed candle
+                history = list(self._candles[asset_name][timeframe])
+
                 logger.debug(f"✅ New candle closed: {asset_name} {timeframe}s @ {completed_candle.timestamp}")
                 
                 # Notify new candle callbacks
                 for cb in self._new_candle_callbacks:
                     try:
-                        cb(completed_candle)
+                        cb(completed_candle, history)
                     except Exception as e:
                         logger.error(f"New candle callback failed: {e}")
             
