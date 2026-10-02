@@ -9,6 +9,7 @@ from typing import Optional, List, Callable
 
 from iqoptionapi.models import *
 from iqoptionapi.state import appstate
+from iqoptionapi.http.auth import IQAuth
 from iqoptionapi.trade import TradeManager
 from iqoptionapi.markets import MarketManager
 from iqoptionapi.utilities import get_asset_id
@@ -17,7 +18,8 @@ from iqoptionapi.instruments import options_assests
 from iqoptionapi.wsmanager.iqwebsocket import WebSocketManager
 from iqoptionapi.wsmanager.message_handler import MessageHandler
 from iqoptionapi.candles import CandleSubscriptionManager
-
+# iqapi.py
+from iqoptionapi.http.auth import IQAuth   # wherever you saved the file above
 
 logger = logging.getLogger("iqoption api")
 load_dotenv()
@@ -42,15 +44,16 @@ class IQOptionClient:
         self.appstate = appstate
         self.email = email or os.getenv('IQ_EMAIL')
         self.password = password or os.getenv('IQ_PASSWORD')
+        self.auth = IQAuth(self.email, self.password)
         self.appstate.validate_account_type(account_type)
 
         # Initialize HTTP session for login requests
         self._connected = False
         self.subscribe_candle = []
-        self.session = requests.Session()
 
         self.subscribe_candle = []
         self.trader_mood = []
+        self.actives_cache = {}
         
         # Initialize core components
         self._init_components()
@@ -66,60 +69,6 @@ class IQOptionClient:
         self.trade_manager = TradeManager(self.websocket, self.message_handler)
         self.candle_manager = CandleSubscriptionManager(self.websocket)
         self.message_handler.set_candle_manager(self.candle_manager)
-
-    def _login(self):
-        """
-        Authenticate with IQOption using email/password.
-        
-        Returns:
-            bool: True if login successful, None otherwise
-        """
-
-        # Validate required credentials
-        if not all([self.email, self.password]):
-            print("Email and password are required!")
-            sys.exit()
-
-        if self._connected:
-            logger.warning('Already connected to iqoption')
-            return
-
-        try:
-            # Send login request
-            response = self.session.post(
-                url='https://api.iqoption.com/v2/login', 
-                data={'identifier': self.email, 'password': self.password})
-            response.raise_for_status()
-
-            # Check if session ID was received (login success indicator)
-            if self.get_session_id():
-                logger.info(f'Successfully logged into an account')
-                return True
-        except Exception as e:
-            logger.warning(e)
-
-    
-    def _logout(self, data=None):
-        """
-        Log out from IQOption and close session.
-        
-        Args:
-            data (dict, optional): Additional logout data
-        """
-        if self.session.post(
-            url="https://auth.iqoption.com/api/v1.0/logout", 
-            data=data).status_code == 200:
-            self._connected = False
-            logger.info(f'Logged out Successfully')
-    
-    def get_session_id(self):
-        """
-        Get the current session ID (SSID) from cookies.
-        
-        Returns:
-            str: Session ID if available, None otherwise
-        """
-        return self.session.cookies.get('ssid')
     
     def connect(self):
         """
@@ -128,12 +77,13 @@ class IQOptionClient:
         Sets up the complete connection pipeline including websocket
         authentication and account initialization.
         """
-        if self._login():
+
+        if self.auth.acquire_ssid():
             # Start websocket connection
             self.websocket.start_websocket()
 
             # Authenticate websocket using session ID
-            self.websocket.send_message('ssid', self.get_session_id())
+            self.websocket.send_message('ssid', self.auth.get_session_id)
 
             ## Wait for profile confirmation (indicates successful auth)
             while self.appstate.profile_msg is None:
@@ -143,7 +93,7 @@ class IQOptionClient:
 
             self._connected = True
             return True
-        
+
     # Expose manager methods for convenience
     def get_balance(self):
         """
@@ -321,7 +271,7 @@ class IQOptionClient:
         """
         if self.websocket:
             self.websocket.close()
-        self._logout()
+        self.auth.destroy_ssid()
         self._connected = False
         logger.info("Disconnected from IQOption")
 
@@ -539,3 +489,28 @@ class IQOptionClient:
     def get_all_traders_mood(self):
         # return highter %
         return self.message_handler.traders_mood
+
+    
+    # -----------------active undelying assets----------------------
+    def get_actives(self, instrument_type:InstrumentType) -> dict:
+        """
+        Returns a dictionary of all actives for the given instrument type.
+        """
+        actives = self.market_manager.fetch_active_assets(instrument_type)
+        self.actives_cache.update(actives)
+        return actives
+
+    def check_active(self, active_id: int) -> dict:
+        """
+        Returns the cached status of an active. 
+        Returns an empty dict if not found.
+        """
+        return self.actives_cache.get(int(active_id), {})
+
+    def get_profit_percent(self, active_id: int) -> int:
+        """Returns the profit percentage for the active (e.g. 86)."""
+        return self.check_active(active_id).get("profit_percent", 0)
+
+    def is_active_open(self, active_id: int) -> bool:
+        """Checks if the active is currently open for trading."""
+        return self.check_active(active_id).get("is_open", False)

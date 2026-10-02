@@ -9,7 +9,9 @@ class InstrumentType(Enum):
     CFD = 'cfd'
     CRYPTO = 'crypto'
     DIGITAL_OPTION = 'digital-option'
-    BINARY_OPTION = 'binary-option'
+    BINARY_OPTION = 'binary'
+    BLITZ_OPTION = 'blitz'
+    TURBO_OPTION = 'turbo'
     
 class OptionType(Enum):
     DIGITAL_OPTION = "digital-option"

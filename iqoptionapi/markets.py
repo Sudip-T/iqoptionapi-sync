@@ -8,6 +8,16 @@ from iqoptionapi.iqapi import InstrumentType
 
 logger = logging.getLogger(__name__)
 
+def _to_seconds(t: int) -> int:
+    """Normalize a UNIX timestamp that may be in ms or s to seconds."""
+    return int(t // 1000) if t > 1_000_000_000_000 else int(t)
+
+def is_market_open(schedule: list, server_time: int) -> bool:
+    now = _to_seconds(server_time)
+    return any(
+        int(w[0]) <= now <= int(w[1])
+        for w in schedule if w and len(w) >= 2
+    )
 
 class MarketManager:
     """
@@ -116,7 +126,7 @@ class MarketManager:
         
         df.to_csv(f'{filename}.csv', index=False)
 
-    def _build_msg_body(self, instrument_type:str):
+    def _build_msg_body(self, instrument_type:InstrumentType):
         """
         Construct WebSocket message body for different instrument types.
         
@@ -135,7 +145,7 @@ class MarketManager:
             - Binary options use v4.0 initialization data endpoint
             - Marginal instruments (forex/cfd/crypto) use v1.0 specific endpoints
         """
-        if instrument_type == 'digital-option':
+        if instrument_type == InstrumentType.DIGITAL_OPTION:
             msg = {
                 "name": "digital-option-instruments.get-underlying-list",
                 "version": "3.0",
@@ -143,22 +153,24 @@ class MarketManager:
                     "filter_suspended": True
                 }
             }
-        elif instrument_type == 'binary-option':
+        elif instrument_type in [InstrumentType.BINARY_OPTION, \
+                                 InstrumentType.BLITZ_OPTION, InstrumentType.TURBO_OPTION]:
             msg= {
                 'body':{},
                 'name':'get-initialization-data',
                 'version':'4.0'
             }
-        elif instrument_type in ['forex', 'cfd', 'crypto']:
+        elif instrument_type in [InstrumentType.FOREX, \
+                            InstrumentType.CFD, InstrumentType.CRYPTO]:
             msg = {
                 'body':{},
                 'version':'1.0',
-                'name':f'marginal-{instrument_type}-instruments.get-underlying-list'
+                'name':f'marginal-{instrument_type.value}-instruments.get-underlying-list'
             }
 
         return msg
     
-    def get_underlying_assests(self, instrument_type:str):
+    def get_underlying_assests(self, instrument_type:InstrumentType):
         """
         Retrieve list of available underlying assets for a specific instrument type.
         
@@ -176,12 +188,6 @@ class MarketManager:
             ValueError: If instrument_type is not supported
     
         """
-
-        # Validate instrument type against enum values
-        valid_types = {instrument.value for instrument in InstrumentType}
-        if instrument_type not in valid_types:
-            raise ValueError(f"Unsupported instrument type: {instrument_type}. "
-                           f"Must be one of: {', '.join(valid_types)}")
 
         # Reset state to ensure fresh data
         self.message_handler._underlying_assests = None
@@ -345,3 +351,39 @@ class MarketManager:
         }
         
         self.ws_manager.send_message(name, msg)
+
+
+    def fetch_active_assets(self, instrument_type:InstrumentType):
+        """
+        Extracts actives status from initialization data.
+        """
+        data = self.get_underlying_assests(instrument_type)
+        server_time = self.message_handler.server_time
+        category_data = data.get(instrument_type.value, {})
+        actives_dict = category_data.get("actives", {})
+        
+        results = {}
+        for active_id, info in actives_dict.items():
+            is_enabled = info.get("enabled", False)
+            is_suspended = info.get("is_suspended", False)
+            schedule = info.get("schedule", [])
+            
+            # Check if currently in an open window
+            market_open = is_market_open(schedule, server_time//1000)
+            market_open = is_enabled and not is_suspended and market_open
+            if not market_open:continue
+
+            # Profit Calculation (100 - commission)
+            commission = info.get("option", {}).get("profit", {}).get("commission", 0)
+            commission = 100 - commission if commission > 0 else 0
+
+            # Detailed Status
+            results[int(active_id)] = {
+                # "name": info.get("name"),
+                "ticker": info.get("ticker"),
+                "is_open": market_open,
+                "profit_percent": commission,
+                # "schedule": schedule
+            }
+
+        return results

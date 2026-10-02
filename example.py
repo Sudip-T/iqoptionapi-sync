@@ -11,11 +11,13 @@ YouTube: @BytecodeAutomation
 ═══════════════════════════════════════════════════════════════════════════
 """
 
+import sys
 import time
 import logging
 from datetime import datetime
 from iqoptionapi.iqapi import IQOptionClient
-from iqoptionapi.models import OptionsTradeParams, Direction, OptionType
+from iqoptionapi.models import OptionsTradeParams, Direction, \
+      OptionType, InstrumentType
 
 # Configure logging for clean output
 logging.basicConfig(
@@ -23,13 +25,12 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
     datefmt='%H:%M:%S'
 )
+
 logger = logging.getLogger("IQOptionExample")
 
 # Your credentials (replace with your own)
-EMAIL = "your email"
-PASSWORD = "your password"
-EMAIL='doveautomotive@hotmail.com'     # Your IQOption email
-PASSWORD='SKKDW10080204'
+EMAIL='jitraders1216@gmail.com'
+PASSWORD='jo121014'
 
 
 # Create client (demo account by default)
@@ -37,9 +38,14 @@ client = IQOptionClient(EMAIL, PASSWORD, account_type='demo')
 
 # Connect to IQ Option
 print("🔌 Connecting to IQ Option...")
-client.connect()
-print("✅ Connected successfully!")
+if client.connect():
+    print("✅ Connected successfully!")
+else:
+    print("Something went wrong!")
+    sys.exit(1)
 
+print(client.get_actives(InstrumentType.BLITZ_OPTION))
+sys.exit(1)
 
 # ═══════════════════════════════════════════════════════════════════════
 # 1. BASIC CONNECTION & ACCOUNT
