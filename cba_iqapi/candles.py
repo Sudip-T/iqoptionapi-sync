@@ -285,7 +285,7 @@ import logging
 from dataclasses import dataclass
 from collections import defaultdict, deque
 from typing import Optional, List, Callable
-from iqoptionapi.instruments.options_assests import UNDERLYING_ASSESTS
+from cba_iqapi.instruments.options_assests import UNDERLYING_ASSESTS
 
 logger = logging.getLogger(__name__)
 

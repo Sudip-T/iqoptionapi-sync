@@ -15,8 +15,8 @@ import sys
 import time
 import logging
 from datetime import datetime
-from iqoptionapi.iqapi import IQOptionClient
-from iqoptionapi.models import OptionsTradeParams, Direction, \
+from cba_iqapi.iqapi import IQOptionClient
+from cba_iqapi.models import OptionsTradeParams, Direction, \
       OptionType, InstrumentType
 
 # Configure logging for clean output
@@ -44,8 +44,8 @@ else:
     print("Something went wrong!")
     sys.exit(1)
 
-print(client.get_actives(InstrumentType.BLITZ_OPTION))
-sys.exit(1)
+# print(client.get_actives(InstrumentType.BLITZ_OPTION))
+# sys.exit(1)
 
 # ═══════════════════════════════════════════════════════════════════════
 # 1. BASIC CONNECTION & ACCOUNT
@@ -186,7 +186,7 @@ def example_get_current_price():
     time.sleep(3)  # Wait for first candle
     
     # Get current price
-    price = client.get_current_price("-op")
+    price = client.get_current_price("EURUSD-op")
     print(f"💰 EURUSD current price: {price:.5f}")
     
     # Get last 5 candles
@@ -259,7 +259,7 @@ def example_place_digital_trade():
     
     # Digital options have higher payouts but different mechanics
     trade_params = OptionsTradeParams(
-        asset="EURUSD",
+        asset="EURUSD-OTC",
         expiry=1,  # 1 minute
         amount=10,
         direction=Direction.PUT,  # Predict price will go DOWN
@@ -343,25 +343,21 @@ def example_get_underlying_assets():
     print("\n" + "="*60)
     print("EXAMPLE 11: GET UNDERLYING ASSETS")
     print("="*60)
-    
-    # Get Forex assets
-    print("📊 Fetching Forex assets...")
-    forex = client.market_manager.get_underlying_assests('forex')
-    print(f"✅ Found {len(forex)} Forex pairs")
-    
-    # Show first 10
-    print("\nFirst 10 Forex pairs:")
-    for asset in forex[:10]:
-        print(f"   {asset['name']} (ID: {asset['active_id']})")
-    
-    # Get Crypto assets
-    print("\n📊 Fetching Crypto assets...")
-    crypto = client.market_manager.get_underlying_assests('crypto')
-    print(f"✅ Found {len(crypto)} Crypto pairs")
-    
-    for asset in crypto[:5]:
-        print(f"   {asset['name']} (ID: {asset['active_id']})")
 
+    print("📊 Fetching assets...")
+    ua = client.market_manager.get_underlying_assests(InstrumentType.BINARY_OPTION)
+    print(f"✅ Found {len(ua)} InstrumentType entries")
+
+    # The value is: {'list': [...], 'actives': {'<id>': {...}, ...}}
+    payload = ua[InstrumentType.BINARY_OPTION.value]
+    actives = payload['actives']              # dict, keyed by string ID
+
+    print(f"\nTotal actives: {len(actives)}")
+    print("First 10 assets:")
+
+    for asset_id, asset in list(actives.items())[:10]:
+        # 'name' and 'id' are the real keys (no 'active_id')
+        print(f"   {asset['ticker']} (ID: {asset['id']})")
 
 # ═══════════════════════════════════════════════════════════════════════
 # 6. ADVANCED: LIVE TRADING WITH SIGNALS
@@ -380,7 +376,7 @@ def example_simple_trading_bot():
     print("🤖 Bot will trade based on candle direction\n")
     
     # Subscribe to candles
-    client.start_candle_stream("EURUSD", 60)
+    client.start_candle_stream("EURUSD-OTC", 60)
     
     trade_count = 0
     max_trades = 3  # Only do 3 trades for demo
@@ -405,7 +401,7 @@ def example_simple_trading_bot():
         
         # Place trade
         trade_params = OptionsTradeParams(
-            asset="EURUSD",
+            asset="EURUSD-OTC",
             expiry=1,
             amount=5,  # Small amount for demo
             direction=direction,
@@ -432,7 +428,7 @@ def example_simple_trading_bot():
         print("\n🛑 Stopped by user")
     
     # Cleanup
-    client.stop_candle_stream("EURUSD", 60)
+    client.stop_candle_stream("EURUSD-OTC", 60)
     print(f"\n💰 Final balance: ${client.get_balance():.2f}")
 
 

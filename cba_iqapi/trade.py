@@ -1,9 +1,9 @@
 import time
 import logging
 from datetime import datetime, UTC
-from iqoptionapi.instruments.options_assests import UNDERLYING_ASSESTS
-from iqoptionapi.utilities import *
-from iqoptionapi.state import appstate
+from cba_iqapi.instruments.options_assests import UNDERLYING_ASSESTS
+from cba_iqapi.utilities import *
+from cba_iqapi.state import appstate
 
 logger = logging.getLogger("api:trade")
 
@@ -89,7 +89,6 @@ class TradeManager:
                     return True, result
                 else:
                     # Failure: result is error message
-                    logger.error(f'Order Executed Failed, Reason: !!! {result} !!!')
                     return False, result
             time.sleep(0.1)
                 

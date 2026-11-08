@@ -4,7 +4,7 @@
 
 import logging
 import time
-from iqoptionapi.iqapi import IQOptionClient
+from cba_iqapi.iqapi import IQOptionClient
 
 # Configure logging
 logging.basicConfig(

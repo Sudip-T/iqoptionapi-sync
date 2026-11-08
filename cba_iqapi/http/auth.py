@@ -19,17 +19,17 @@ class IQAuth:
             sys.exit()
 
     def acquire_ssid(self) -> str:
-        """Log in and return the SSID (session id) string.
+        """Log in and return the SSID string.
 
         Raises:
-            ValueError: bad request / API-level error / missing ssid
+            ValueError: bad request, or login succeeded but no ssid returned
             PermissionError: 401 or 403
-            ConnectionError: network failure, rate limit, or unknown HTTP error
+            ConnectionError: network failure, rate limit, or unexpected HTTP status
         """
+        ssid = self.get_session_id
+        if ssid:                                   # already authenticated
+            return ssid
 
-        # Already authenticated? Skip the POST.
-        if self.get_session_id: return True
-        
         try:
             resp = self.session.post(
                 "https://auth.iqoption.com/api/v2/login",
@@ -41,45 +41,33 @@ class IQAuth:
             raise ConnectionError(f"Connection error during login: {e}") from e
 
         if resp.status_code == 200:
-            try:
-                if self.get_session_id:
-                    logger.info(f'SSID acquired successfully')
-                    return True
-            except ValueError:
-                logger.error("auth_invalid_json: %s", resp.text)
-                raise ValueError("Login response was not valid JSON")
+            ssid = self.get_session_id             # read from the session cookies
+            if ssid:
+                logger.info("SSID acquired successfully")
+                return ssid
+            logger.error("auth_missing_ssid: %s", resp.text)
+            raise ValueError("Login succeeded but no ssid was returned")
 
-            # if data.get("code") == "success":
-            #     ssid = data.get("ssid") or ""
-            #     if not ssid:
-            #         logger.error("auth_missing_ssid: %s", data)
-            #         raise ValueError("Login succeeded but no ssid was returned")
-            #     return ssid
-
-            # msg = data.get("message") or str(data)
-            # logger.error("auth_api_error: %s", data)
-            # raise ValueError(f"Authentication API error: {msg}")
-
-        
-        if resp.status_code == 400: # 400 — malformed request
+        if resp.status_code == 400:
             logger.error("auth_bad_request: %s", resp.text)
             raise ValueError("Bad request (400). Check email/password format.")
-        if resp.status_code == 401: # 401 — wrong credentials
+        if resp.status_code == 401:
             logger.error("auth_unauthorized")
             raise PermissionError("Invalid credentials (401).")
-        if resp.status_code == 403: # 403 — IP blocked / WAF
-            logger.error("auth_forbidden")
-            raise PermissionError("Access denied (403). IP may be blocked.")
-        if resp.status_code == 429: # 429 — rate limited
+        if resp.status_code == 403:
+            # TODO: inspect resp.json() here, 403 may mean "2FA required"
+            logger.error("auth_forbidden: %s", resp.text)
+            raise PermissionError("Access denied (403). IP blocked or 2FA required.")
+        if resp.status_code == 429:
             logger.error("auth_rate_limit")
             raise ConnectionError("Too many login attempts (429). Wait a few minutes.")
 
-        # Anything else non-2xx (5xx, unexpected 4xx) → raise_for_status
         try:
             resp.raise_for_status()
         except requests.HTTPError as e:
             logger.error("auth_http_error: %s", e)
             raise ConnectionError(f"Auth HTTP error: {resp.status_code}") from e
+        raise ConnectionError(f"Unexpected login response: {resp.status_code}")
 
     @property
     def get_session_id(self):

@@ -5,8 +5,8 @@ from datetime import datetime
 from dataclasses import dataclass
 from typing import Optional, List
 from typing import List, Dict, Any
-from iqoptionapi.utilities import get_timestamps
-from iqoptionapi.state import appstate
+from cba_iqapi.utilities import get_timestamps
+from cba_iqapi.state import appstate
 logger = logging.getLogger("api:account")
 
 

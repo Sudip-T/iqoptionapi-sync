@@ -1,10 +1,10 @@
 import json
 import logging
 logger = logging.getLogger(__name__)
-from iqoptionapi.state import appstate
+from cba_iqapi.state import appstate
 from collections import defaultdict, deque
-from iqoptionapi.models import TradeOutcomeChecker
-from iqoptionapi.candles import CandleSubscriptionManager
+from cba_iqapi.models import TradeOutcomeChecker
+from cba_iqapi.candles import CandleSubscriptionManager
 
 
 def nested_dict(n, type):

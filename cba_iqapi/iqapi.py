@@ -7,19 +7,17 @@ import threading
 from dotenv import load_dotenv
 from typing import Optional, List, Callable
 
-from iqoptionapi.models import *
-from iqoptionapi.state import appstate
-from iqoptionapi.http.auth import IQAuth
-from iqoptionapi.trade import TradeManager
-from iqoptionapi.markets import MarketManager
-from iqoptionapi.utilities import get_asset_id
-from iqoptionapi.accounts import AccountManager
-from iqoptionapi.instruments import options_assests
-from iqoptionapi.wsmanager.iqwebsocket import WebSocketManager
-from iqoptionapi.wsmanager.message_handler import MessageHandler
-from iqoptionapi.candles import CandleSubscriptionManager
-# iqapi.py
-from iqoptionapi.http.auth import IQAuth   # wherever you saved the file above
+from cba_iqapi.models import *
+from cba_iqapi.state import appstate
+from cba_iqapi.http.auth import IQAuth
+from cba_iqapi.trade import TradeManager
+from cba_iqapi.markets import MarketManager
+from cba_iqapi.utilities import get_asset_id
+from cba_iqapi.accounts import AccountManager
+from cba_iqapi.instruments import options_assests
+from cba_iqapi.wsmanager.iqwebsocket import WebSocketManager
+from cba_iqapi.wsmanager.message_handler import MessageHandler
+from cba_iqapi.candles import CandleSubscriptionManager
 
 logger = logging.getLogger("iqoption api")
 load_dotenv()
@@ -70,29 +68,37 @@ class IQOptionClient:
         self.candle_manager = CandleSubscriptionManager(self.websocket)
         self.message_handler.set_candle_manager(self.candle_manager)
     
-    def connect(self):
-        """
-        Establish full connection: login + websocket + authentication.
-        
-        Sets up the complete connection pipeline including websocket
-        authentication and account initialization.
-        """
+    def connect(self, timeout: float = 30.0):
+        """Login + websocket + authentication.
 
-        if self.auth.acquire_ssid():
-            # Start websocket connection
+        Returns:
+            (True, None) on success, (False, reason) on failure.
+        """
+        try:
+            ssid = self.auth.acquire_ssid()
+
+            self.appstate.profile_msg = None       # clear stale state (reconnects)
             self.websocket.start_websocket()
+            self.websocket.send_message("ssid", ssid)
 
-            # Authenticate websocket using session ID
-            self.websocket.send_message('ssid', self.auth.get_session_id)
-
-            ## Wait for profile confirmation (indicates successful auth)
+            deadline = time.monotonic() + timeout
             while self.appstate.profile_msg is None:
-                time.sleep(.1)
+                if time.monotonic() > deadline:
+                    raise TimeoutError(f"No profile message within {timeout}s")
+                time.sleep(0.1)
 
-            self.account_manager._portfolio_position_change('subscribeMessage')
-
+            self.account_manager._portfolio_position_change("subscribeMessage")
             self._connected = True
-            return True
+            return True, 'Successfully connected to IQOption'
+
+        except Exception as e:
+            # logger.exception("Connection failed")
+            self._connected = False
+            try:
+                self.websocket.close()             # use whatever your class calls this
+            except Exception:
+                pass
+            return False, str(e)
 
     # Expose manager methods for convenience
     def get_balance(self):

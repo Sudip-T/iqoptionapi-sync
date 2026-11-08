@@ -3,8 +3,8 @@ import logging
 import pandas as pd
 import mplfinance as mpf
 from typing import List, Dict
-from iqoptionapi.utilities import get_asset_id
-from iqoptionapi.iqapi import InstrumentType
+from cba_iqapi.utilities import get_asset_id
+from cba_iqapi.models import InstrumentType
 
 logger = logging.getLogger(__name__)
 

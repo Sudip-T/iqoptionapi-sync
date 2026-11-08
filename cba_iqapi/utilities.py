@@ -2,7 +2,7 @@ import time
 import logging
 from typing import Optional
 from datetime import datetime, timedelta
-from iqoptionapi.instruments.options_assests import UNDERLYING_ASSESTS
+from cba_iqapi.instruments.options_assests import UNDERLYING_ASSESTS
 
 logger = logging.getLogger(__name__)
 
